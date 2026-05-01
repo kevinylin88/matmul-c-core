@@ -1,0 +1,7 @@
+main
+*.o
+*.out
+callgrind.out.*
+correctness/bin/
+.codex/
+tunedata_*.txt
