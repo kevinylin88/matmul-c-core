@@ -44,7 +44,7 @@ static int run_case(size_t m, size_t n, size_t k, int use_blas_reference)
     }else{
         multiply_plain(a, b, expected);
     }
-    matmul_v8_avx512_omp_improved(a, b, actual);
+    matmul_v8_avx512_omp_improved(a, b, actual, 132, 8640, 160);
 
     double max_abs_error = 0.0;
     size_t max_i = 0;

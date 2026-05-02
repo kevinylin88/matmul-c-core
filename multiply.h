@@ -56,7 +56,7 @@ void matmul_v4_avx2(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v5_openmp(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v6_omp_avx_6x16(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v7_avx512_omp(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
-void matmul_v8_avx512_omp_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
+void matmul_v8_avx512_omp_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, size_t ii, size_t jj, size_t kk);
 void matmul_v9_OpenBLAS(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void compare_error(struct Matrix expected, struct Matrix actual);

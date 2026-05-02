@@ -14,16 +14,6 @@ static int cmp_double(const void *a, const void *b)
     return (da > db) - (da < db);
 }
 
-#ifndef II
-#define II 144
-#endif
-#ifndef JJ
-#define JJ 640
-#endif
-#ifndef KK
-#define KK 192
-#endif
-
 #ifndef DEFAULT_DIM
 #define DEFAULT_DIM 8000
 #endif
@@ -52,6 +42,19 @@ static size_t env_size_or_default(const char *name, size_t default_value)
     char *end = NULL;
     unsigned long long parsed = strtoull(value, &end, 10);
     if(end == value || parsed == 0){
+        return default_value;
+    }
+    return (size_t)parsed;
+}
+
+static size_t arg_size_or_default(int argc, char **argv, int index, size_t default_value)
+{
+    if(index >= argc){
+        return default_value;
+    }
+    char *end = NULL;
+    unsigned long long parsed = strtoull(argv[index], &end, 10);
+    if(end == argv[index] || parsed == 0){
         return default_value;
     }
     return (size_t)parsed;
@@ -90,13 +93,16 @@ static double gflops_for(size_t dim, double ms)
     return flops / (ms * 1.0e6);
 }
 
-static void tune_matmul(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3)
+static void tune_matmul(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, size_t ii, size_t jj, size_t kk)
 {
-    matmul_v8_avx512_omp_improved(mat1, mat2, mat3);
+    matmul_v8_avx512_omp_improved(mat1, mat2, mat3, ii, jj, kk);
 }
 
-int main(void)
+int main(int argc, char **argv)
 {
+    size_t ii = arg_size_or_default(argc, argv, 1, 144);
+    size_t jj = arg_size_or_default(argc, argv, 2, 640);
+    size_t kk = arg_size_or_default(argc, argv, 3, 192);
     size_t dim = env_size_or_default("DIM", DEFAULT_DIM);
     size_t repeat = env_size_or_default("REPEAT", DEFAULT_REPEAT);
     size_t warmup = env_size_or_default("WARMUP", DEFAULT_WARMUP);
@@ -123,7 +129,7 @@ int main(void)
 
     for(size_t r = 0; r < warmup; r++){
         memset(c.data, 0, matrix_bytes);
-        tune_matmul(a, b, c);
+        tune_matmul(a, b, c, ii, jj, kk);
     }
 
     double *samples = malloc(repeat * sizeof(double));
@@ -142,7 +148,7 @@ int main(void)
     for(size_t r = 0; r < repeat; r++){
         memset(c.data, 0, matrix_bytes);
         double start = time_ms();
-        tune_matmul(a, b, c);
+        tune_matmul(a, b, c, ii, jj, kk);
         double end = time_ms();
         double elapsed = end - start;
         samples[r] = elapsed;
@@ -153,8 +159,8 @@ int main(void)
         if(elapsed > worst_ms){
             worst_ms = elapsed;
         }
-        printf("RUN II=%d JJ=%d KK=%d DIM=%zu ITER=%zu MS=%.3f GFLOPS=%.2f\n",
-               II, JJ, KK, dim, r + 1, elapsed, gflops_for(dim, elapsed));
+        printf("RUN II=%zu JJ=%zu KK=%zu DIM=%zu ITER=%zu MS=%.3f GFLOPS=%.2f\n",
+               ii, jj, kk, dim, r + 1, elapsed, gflops_for(dim, elapsed));
         fflush(stdout);
     }
 
@@ -166,10 +172,10 @@ int main(void)
     double avg_ms = total_ms / (double)repeat;
     double checksum = checksum_sample(c);
 
-    printf("RESULT II=%d JJ=%d KK=%d DIM=%zu REPEAT=%zu THREADS=%d AVG_MS=%.3f MED_MS=%.3f BEST_MS=%.3f WORST_MS=%.3f AVG_GFLOPS=%.2f BEST_GFLOPS=%.2f MED_GFLOPS=%.2f CHECKSUM=%.9e\n",
-           II,
-           JJ,
-           KK,
+    printf("RESULT II=%zu JJ=%zu KK=%zu DIM=%zu REPEAT=%zu THREADS=%d AVG_MS=%.3f MED_MS=%.3f BEST_MS=%.3f WORST_MS=%.3f AVG_GFLOPS=%.2f BEST_GFLOPS=%.2f MED_GFLOPS=%.2f CHECKSUM=%.9e\n",
+           ii,
+           jj,
+           kk,
            dim,
            repeat,
            omp_get_max_threads(),

@@ -3,5 +3,6 @@ main
 *.out
 callgrind.out.*
 correctness/bin/
+.codex
 .codex/
-tunedata_*.txt
+tune_matmul/tunedata*.txt

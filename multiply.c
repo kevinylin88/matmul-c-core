@@ -21,6 +21,12 @@ static int check_matrix(struct Matrix mat1, struct Matrix mat2, struct Matrix ma
     return 0;
 }
 
+static void *aligned_alloc64_floats(size_t count){
+    size_t bytes = count * sizeof(float);
+    size_t aligned_bytes = ((bytes + 63) / 64) * 64;
+    return aligned_alloc(64, aligned_bytes);
+}
+
 int set_memory_limit(size_t bytes){
     struct rlimit limit;//储存soft/hard limit的结构体
     limit.rlim_cur = (rlim_t)bytes;//转换到rlim_t
@@ -582,26 +588,20 @@ void matmul_v7_avx512_omp(
     }
 }
 
-#ifndef II
-#define II 132
-#endif
-#ifndef JJ
-#define JJ 8640
-#endif
-#ifndef KK
-#define KK 160
-#endif
-
 void matmul_v8_avx512_omp_improved(
-    struct Matrix mat1, struct Matrix mat2, struct Matrix mat3
+    struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, size_t ii, size_t jj, size_t kk
 ){
 
     if(check_matrix(mat1, mat2, mat3) == -1){exit(-1);}//入口检查
+    if(ii == 0 || jj == 0 || kk == 0){
+        fprintf(stderr, "Error: block parameters must be greater than 0.\n");
+        exit(-1);
+    }
 
     struct Matrix mat2_block;
-    size_t mat2_block_panels = ((size_t)JJ + NR - 1) / NR;//向上取整
+    size_t mat2_block_panels = (jj + NR - 1) / NR;//向上取整
     //优化访存
-    mat2_block.data = aligned_alloc(64, mat2_block_panels * (size_t)KK * NR * sizeof(float));
+    mat2_block.data = aligned_alloc64_floats(mat2_block_panels * kk * NR);
 
     if(mat2_block.data == NULL){
         fprintf(stderr, "Error: malloc hit memory limit for block size %d * %d.\n",BLOCK_LEAP, BLOCK_LEAP);
@@ -612,7 +612,7 @@ void matmul_v8_avx512_omp_improved(
     #pragma omp parallel
     {
         struct Matrix mat1_block;
-        mat1_block.data = aligned_alloc(64, (size_t) II * KK * sizeof(float));
+        mat1_block.data = aligned_alloc64_floats(ii * kk);
 
         if(mat1_block.data == NULL){
             fprintf(stderr, "Error: malloc hit memory limit for block size %d * %d.\n",BLOCK_LEAP, BLOCK_LEAP);
@@ -620,11 +620,11 @@ void matmul_v8_avx512_omp_improved(
             exit(-1);
         }
 
-        for(size_t j = 0; j < mat2.cols; j+=JJ){
-                size_t j_start = j, j_end = MIN(j + JJ, mat2.cols);
+        for(size_t j = 0; j < mat2.cols; j+=jj){
+                size_t j_start = j, j_end = MIN(j + jj, mat2.cols);
 
-            for(size_t k = 0; k < mat1.cols; k+=KK){
-                size_t k_start = k, k_end = MIN(k + KK, mat1.cols);
+            for(size_t k = 0; k < mat1.cols; k+=kk){
+                size_t k_start = k, k_end = MIN(k + kk, mat1.cols);
 
                 #pragma omp single
                 {
@@ -644,8 +644,8 @@ void matmul_v8_avx512_omp_improved(
                 }
 
                 #pragma omp for
-                for(size_t i = 0; i < mat1.rows; i+=II){
-                size_t i_start = i, i_end = MIN(i + II, mat1.rows);
+                for(size_t i = 0; i < mat1.rows; i+=ii){
+                size_t i_start = i, i_end = MIN(i + ii, mat1.rows);
 
                 mat1_block.rows = i_end - i_start; mat1_block.cols = k_end - k_start;
 
@@ -769,6 +769,100 @@ void matmul_v8_avx512_omp_improved(
     free(mat2_block.data);
 }
 
+void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3){
+    if(check_matrix(mat1, mat2, mat3) == -1){exit(-1);}
+
+    size_t total_elems = mat1.cols * mat1.rows + mat2.cols * mat2.rows;
+
+    if(total_elems <= 128*128*2){
+        matmul_v4_avx2(mat1, mat2, mat3);
+        return;
+    }
+
+    if(total_elems <= 600*600*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 36, 512, 192);
+        return;
+    }
+
+    if(total_elems <= 850*850*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 48, 640, 128);
+        return;
+    }
+
+    if(total_elems <= 1000*1000*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 6, 896, 128);
+        return;
+    }
+
+    if(total_elems <= 1500*1500*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 12, 1792, 208);
+        return;
+    }
+
+    if(total_elems <= 2000*2000*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 126, 2048, 208);
+        return;
+    }
+
+    if(total_elems <= 2500*2500*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 84, 3840, 240);
+        return;
+    }
+
+    if(total_elems <= 3000*3000*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 72, 3840, 240);
+        return;
+    }
+
+    if(total_elems <= 3500*3500*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 3840, 240);
+        return;
+    }
+
+    if(total_elems <= 4000*4000*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 5120, 256);
+        return;
+    }
+
+    if(total_elems <= 4500*4500*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 5120, 256);
+        return;
+    }
+
+    if(total_elems <= 5000*5000*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 5632, 256);
+        return;
+    }
+
+    if(total_elems <= 5500*5500*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 5632, 256);
+        return;
+    }
+
+    if(total_elems <= 6000*6000*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 6144, 256);
+        return;
+    }
+
+    if(total_elems <= 6500*6500*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 8192, 256);
+        return;
+    }
+
+    if(total_elems <= 7000*7000*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 72, 8192, 288);
+        return;
+    }
+
+    if(total_elems <= 7500*7500*2){
+        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 8192, 256);
+        return;
+    }
+
+    matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 132, 8640, 160);
+}
+
+
 void matmul_v9_OpenBLAS(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3){
     if(check_matrix(mat1, mat2, mat3) == -1){exit(-1);}
 
@@ -789,11 +883,6 @@ void matmul_v9_OpenBLAS(struct Matrix mat1, struct Matrix mat2, struct Matrix ma
     mat3.data,          // C
     (int)mat3.cols      // ldc
     );
-}
-
-void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3){
-    if(check_matrix(mat1, mat2, mat3) == -1){exit(-1);}
-    matmul_v7_avx512_omp(mat1, mat2, mat3);
 }
 
 Transform get_transform(float max_val, float min_val){

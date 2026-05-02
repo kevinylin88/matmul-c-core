@@ -8,11 +8,11 @@ RESULTS_FILE="$(mktemp)"
 mkdir -p "$BUILD_DIR"
 
 CC="${CC:-gcc}"
-DIM="${DIM:-4000}"
+DIM="${DIM:-1000}"
 REPEAT="${REPEAT:-15}"
 WARMUP="${WARMUP:-1}"
 THREADS="${OMP_NUM_THREADS:-16}"
-AUTO_REFINE="${AUTO_REFINE:-1}"
+AUTO_REFINE="${AUTO_REFINE:-0}"
 
 export OMP_NUM_THREADS="$THREADS"
 export OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-1}"
@@ -34,35 +34,63 @@ LDFLAGS=(
   -lm
 )
 
-# Candidates are centered on the best DIM=8000 panel-B results:
-#   168 832 224, 168 704 224, 168 704 256, 168 768 224, 180 832 224.
-# DIM=4000 has a different edge/tile interaction, so keep a few smaller JJ/KK
-# baselines and sweep around the winning larger-JJ panel-B region.
+# Broad 50-point sweep for DIM=1000.
 DEFAULT_CANDIDATES=$(cat <<'PARAMS'
-132 512 160
-132 640 160
-144 640 160
-168 640 160
-156 576 224
-156 704 224
-168 576 224
-168 640 224
-168 704 224
-168 704 192
-168 704 256
-168 768 224
-168 832 224
-168 832 192
-168 832 256
-168 896 224
-180 704 224
-180 768 224
-180 832 224
-180 832 256
+72 512 96
+72 768 128
+72 1024 160
+72 1536 192
+72 2048 224
+84 512 128
+84 768 160
+84 1024 192
+84 1536 224
+84 2048 256
+96 512 128
+96 768 160
+96 1024 192
+96 1536 224
+96 2048 256
+96 3072 160
+96 4096 192
+108 768 128
+108 1024 160
+108 1536 192
+108 2048 224
+108 3072 256
+120 768 128
+120 1024 160
+120 1536 192
+120 2048 224
+120 3072 256
+120 4096 320
+132 768 128
+132 1024 160
+132 1536 192
+132 2048 224
+132 3072 256
+132 4096 320
+132 8192 160
+132 8192 224
+132 8192 320
+144 1024 128
+144 1536 160
+144 2048 192
+144 3072 224
+144 4096 256
+144 8192 160
+156 1024 128
+156 1536 160
+156 2048 192
+156 3072 224
+156 4096 256
+156 8192 160
+156 8192 320
 PARAMS
 )
 
 CANDIDATES="${CANDIDATES:-$DEFAULT_CANDIDATES}"
+BENCH_BIN="$BUILD_DIR/bench_matmul_params"
 
 extract_field()
 {
@@ -87,6 +115,14 @@ already_tested()
   grep -q "II=$ii JJ=$jj KK=$kk " "$RESULTS_FILE" 2>/dev/null
 }
 
+printf '==== compile parameterized bench ====\n'
+"$CC" "${CFLAGS[@]}" \
+  "$BENCH_C" \
+  "$ROOT_DIR/multiply.c" \
+  "$ROOT_DIR/kernel.c" \
+  "${LDFLAGS[@]}" \
+  -o "$BENCH_BIN"
+
 run_one()
 {
   local ii="$1"
@@ -97,19 +133,10 @@ run_one()
     return
   fi
 
-  local bin="$BUILD_DIR/bench_matmul_ii${ii}_jj${jj}_kk${kk}"
-  printf '\n==== compile/run II=%s JJ=%s KK=%s DIM=%s REPEAT=%s THREADS=%s ====\n' \
+  printf '\n==== run II=%s JJ=%s KK=%s DIM=%s REPEAT=%s THREADS=%s ====\n' \
     "$ii" "$jj" "$kk" "$DIM" "$REPEAT" "$THREADS"
 
-  "$CC" "${CFLAGS[@]}" \
-    -DII="$ii" -DJJ="$jj" -DKK="$kk" \
-    "$BENCH_C" \
-    "$ROOT_DIR/multiply.c" \
-    "$ROOT_DIR/kernel.c" \
-    "${LDFLAGS[@]}" \
-    -o "$bin"
-
-  DIM="$DIM" REPEAT="$REPEAT" WARMUP="$WARMUP" "$bin" | tee /tmp/tune_matmul_current.txt
+  DIM="$DIM" REPEAT="$REPEAT" WARMUP="$WARMUP" "$BENCH_BIN" "$ii" "$jj" "$kk" | tee /tmp/tune_matmul_current.txt
   grep '^RESULT ' /tmp/tune_matmul_current.txt >> "$RESULTS_FILE"
 }
 

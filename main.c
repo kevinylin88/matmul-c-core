@@ -5,9 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include "multiply.h"
 
-#define MEASURE_TIME 5
+#define MEASURE_TIME 20
 #define MAX_MEMORY 8ULL*1024*1024*1024
 #define MATRIX_ALIGNMENT 32
 
@@ -21,6 +22,24 @@ double time_ms(void){
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (double)ts.tv_sec * 1e3 + (double)ts.tv_nsec / 1e6;
 }
+
+//打印平均值
+static void print_stats(const char *name, double *samples, int count){
+    double total = 0.0;
+    double best = samples[0];
+    double worst = samples[0];
+    for(int i = 0; i < count; i++){
+        total += samples[i];
+        if(samples[i] < best){
+            best = samples[i];
+        }
+        if(samples[i] > worst){
+            worst = samples[i];
+        }
+    }
+    printf("%s: AVG=%f ms BEST=%f ms WORST=%f ms\n", name, total / count, best, worst);
+}
+
 void set_mat(struct Matrix mat){
     for(size_t i = 0; i < mat.rows*mat.cols; i++){
         //FPU的硬件结构决定了0-1之间的乘法和大浮点数乘法时间完全相同，为方便我们取0-1
@@ -39,7 +58,13 @@ void set_largenum_mat(struct Matrix mat){
     }
 }
 
-void warmup_multiply(size_t dim, int times){
+//根据用户输入判断是否使用openblas来测试
+static int use_openblas_mode(int argc, char **argv){
+    return argc > 1 && strcmp(argv[1], "openblas") == 0;
+}
+
+//warmup
+void warmup_multiply(size_t dim, int times, int use_openblas){
     struct Matrix mat1, mat2, mat3;
 
     mat1.rows = dim; mat1.cols = dim;
@@ -62,7 +87,11 @@ void warmup_multiply(size_t dim, int times){
 
     for(int i = 0; i < times; i++){
         memset(mat3.data, 0, sizeof(float) * mat3.rows * mat3.cols);
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3);
+        if(use_openblas){
+            matmul_v9_OpenBLAS(mat1, mat2, mat3);
+        }else{
+            multiply_improved(mat1, mat2, mat3);
+        }
     }
 
     free(mat1.data);
@@ -70,8 +99,25 @@ void warmup_multiply(size_t dim, int times){
     free(mat3.data);
 }
 
-int main(){
-    size_t dim[] = {16000};//测试不同规模的矩阵乘法性能
+static void measure_matmul(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, double *samples, int count, int use_openblas){
+    for(int i = 0; i < count; i++){
+        memset(mat3.data, 0, sizeof(float) * mat3.rows * mat3.cols);
+        double start = time_ms();
+        if(use_openblas){
+            matmul_v9_OpenBLAS(mat1, mat2, mat3);
+        }else{
+            multiply_improved(mat1, mat2, mat3);
+        }
+        double end = time_ms();
+        samples[i] = end - start;
+    }
+}
+
+int main(int argc, char **argv){
+
+    size_t dim[] = {4500};//测试不同规模的矩阵乘法性能
+    int use_openblas = use_openblas_mode(argc, argv);
+    const char *bench_name = use_openblas ? "OpenBLAS" : "multiply_improved";
 
     //设定最大的内存限制，并确保该内存可以被分配
     if(set_memory_limit((size_t)MAX_MEMORY) != 0){//设置内存限制，防止malloc导致内存爆炸
@@ -79,7 +125,7 @@ int main(){
         exit(-1);
     }
     
-    warmup_multiply(1200, 300);
+    warmup_multiply(1200, 100, use_openblas);
 
     for(size_t i = 0; i < sizeof(dim) / sizeof(dim[0]); i++){
         struct Matrix mat1, mat2, mat3;
@@ -106,23 +152,12 @@ int main(){
         set_mat(mat2);
         for(size_t i = 0; i < mat3.rows*mat3.cols; i++) *(mat3.data + i) = 0.0f;
 
-        double total_time = 0.0;
-        double avg_time = 0.0;
+        double samples[MEASURE_TIME];//栈上，不需要free内存，用于存储数据
 
-        //使用multiply_improved函数进行矩阵乘法，并测量平均时间
-        for(int i = 0; i < MEASURE_TIME; i++){
-            double start = 0; double end = 0;
-
-            memset(mat3.data, 0, sizeof(float) * mat3.rows * mat3.cols);
-            start = time_ms();
-            matmul_v8_avx512_omp_improved(mat1, mat2, mat3);
-            end = time_ms(); 
-
-            total_time += end - start;
-        }
-        avg_time = total_time / MEASURE_TIME;
         printf("MATRIX SIZE %zu * %zu\n", mat1.rows, mat2.cols);
-        printf("MATMUL: AVERAGE_TIME: %f ms\n", avg_time);
+        printf("BENCHMARK %s\n", bench_name);
+        measure_matmul(mat1, mat2, mat3, samples, MEASURE_TIME, use_openblas);
+        print_stats(bench_name, samples, MEASURE_TIME);
 
         free(mat3.data);
         free(mat1.data);

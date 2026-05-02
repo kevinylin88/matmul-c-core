@@ -119,7 +119,7 @@ DIM=8000 REPEAT=15 bash tune_matmul/run_tune_matmul.sh | tee tune_matmul/tunedat
 The tuning benchmark calls:
 
 ```c
-matmul_v8_avx512_omp_improved(mat1, mat2, mat3);
+matmul_v8_avx512_omp_improved(mat1, mat2, mat3, ii, jj, kk);
 ```
 
 The script prints `AVG_MS`, `MED_MS`, `BEST_MS`, `WORST_MS`, `AVG_GFLOPS`,
@@ -162,4 +162,3 @@ C = A * B
 
 with `beta = 0.0f`, so OpenBLAS overwrites C. Most custom kernels accumulate
 with `+=`, so C must be zeroed before calling them.
-
