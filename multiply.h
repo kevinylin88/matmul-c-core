@@ -20,7 +20,7 @@
 #ifndef NR
 #define NR 32
 #endif
-#define SIMD_LEAP 16
+#define SIMD_LEAP 8
 #define SIMD_LEAP_ROW 6 //寄存器大小是四行
 #define MIN(a,b) ((a) <= (b) ? (a) : (b))
 

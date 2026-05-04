@@ -140,13 +140,12 @@ void matmul_v4_avx2(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3){
                                 j_start,
                                 mat1_block.cols);
                         }else{
-                            for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                float sum = 0.0f;
-                                for(size_t kd = 0; kd < mat1_block.cols; kd++){
-                                    sum += *(mat1_block.data + id * mat1_block.cols + kd) *
-                                           *(mat2_block.data + kd * mat2_block.cols + tail_jd);
+                            for(size_t kd = 0; kd < mat1_block.cols; kd++){
+                                float a = *(mat1_block.data + id * mat1_block.cols + kd);
+                                for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
+                                    *(mat3.data + (i_start + id) * mat3.cols + j_start + tail_jd) +=
+                                        a * *(mat2_block.data + kd * mat2_block.cols + tail_jd);
                                 }
-                                *(mat3.data + (i_start + id) * mat3.cols + j_start + tail_jd) += sum;
                             }
                         }
                     }
@@ -437,7 +436,7 @@ void matmul_v7_avx512_omp(
 ){
     if(check_matrix(mat1, mat2, mat3) == -1){exit(-1);}//入口检查
 
-    #pragma omp parallel
+    #pragma omp parallel //创建线程组，每个线程分配私有的 mat1_block/mat2_block
     {
         struct Matrix mat1_block; struct Matrix mat2_block;
         mat1_block.data = aligned_alloc(64, (size_t) BLOCK_LEAP * BLOCK_LEAP * sizeof(float));
@@ -494,9 +493,7 @@ void matmul_v7_avx512_omp(
                             for(size_t kd = 0; kd < mat1_block.cols; kd++){
                                 float a = *(mat1_block.data + (id + row) * mat1_block.cols + kd);
                                 for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                    size_t panel = tail_jd / NR;
-                                    size_t inner = tail_jd % NR;
-                                    float b = *(mat2_block.data + panel * mat2_block.rows * NR + kd * NR + inner);
+                                    float b = *(mat2_block.data + kd * mat2_block.cols + tail_jd);
                                     *(mat3_row + tail_jd) += a * b;
                                 }
                             }
@@ -520,9 +517,7 @@ void matmul_v7_avx512_omp(
                             for(size_t kd = 0; kd < mat1_block.cols; kd++){
                                 float a = *(mat1_block.data + (id + row) * mat1_block.cols + kd);
                                 for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                    size_t panel = tail_jd / NR;
-                                    size_t inner = tail_jd % NR;
-                                    float b = *(mat2_block.data + panel * mat2_block.rows * NR + kd * NR + inner);
+                                    float b = *(mat2_block.data + kd * mat2_block.cols + tail_jd);
                                     *(mat3_row + tail_jd) += a * b;
                                 }
                             }
@@ -546,9 +541,7 @@ void matmul_v7_avx512_omp(
                             for(size_t kd = 0; kd < mat1_block.cols; kd++){
                                 float a = *(mat1_block.data + (id + row) * mat1_block.cols + kd);
                                 for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                    size_t panel = tail_jd / NR;
-                                    size_t inner = tail_jd % NR;
-                                    float b = *(mat2_block.data + panel * mat2_block.rows * NR + kd * NR + inner);
+                                    float b = *(mat2_block.data + kd * mat2_block.cols + tail_jd);
                                     *(mat3_row + tail_jd) += a * b;
                                 }
                             }
@@ -571,9 +564,7 @@ void matmul_v7_avx512_omp(
                         for(size_t kd = 0; kd < mat1_block.cols; kd++){
                             float a = *(mat1_block.data + id * mat1_block.cols + kd);
                             for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                size_t panel = tail_jd / NR;
-                                size_t inner = tail_jd % NR;
-                                float b = *(mat2_block.data + panel * mat2_block.rows * NR + kd * NR + inner);
+                                float b = *(mat2_block.data + kd * mat2_block.cols + tail_jd);
                                 *(mat3_row + tail_jd) += a * b;
                             }
                         }
@@ -765,7 +756,6 @@ void matmul_v8_avx512_omp_improved(
         }
         free(mat1_block.data);
     }
-
     free(mat2_block.data);
 }
 
@@ -775,7 +765,7 @@ void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat
     size_t total_elems = mat1.cols * mat1.rows + mat2.cols * mat2.rows;
 
     if(total_elems <= 128*128*2){
-        matmul_v4_avx2(mat1, mat2, mat3);
+        matmul_v3_block(mat1, mat2, mat3);
         return;
     }
 

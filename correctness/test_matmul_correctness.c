@@ -44,7 +44,7 @@ static int run_case(size_t m, size_t n, size_t k, int use_blas_reference)
     }else{
         multiply_plain(a, b, expected);
     }
-    matmul_v8_avx512_omp_improved(a, b, actual, 132, 8640, 160);
+    matmul_v7_avx512_omp(a, b, actual);
 
     double max_abs_error = 0.0;
     size_t max_i = 0;
@@ -63,7 +63,7 @@ static int run_case(size_t m, size_t n, size_t k, int use_blas_reference)
 
     double tolerance = use_blas_reference ? 1.0e-2 : 1.0e-3;
     if(max_abs_error > tolerance){
-        printf("FAIL v8 m=%zu n=%zu k=%zu ref=%s max_abs_error=%e at (%zu, %zu)\n",
+        printf("FAIL v7 m=%zu n=%zu k=%zu ref=%s max_abs_error=%e at (%zu, %zu)\n",
                m, n, k, use_blas_reference ? "blas" : "plain", max_abs_error, max_i, max_j);
         free(a.data);
         free(b.data);
@@ -72,7 +72,7 @@ static int run_case(size_t m, size_t n, size_t k, int use_blas_reference)
         return 1;
     }
 
-    printf("PASS v8 m=%zu n=%zu k=%zu ref=%s max_abs_error=%e\n",
+    printf("PASS v7 m=%zu n=%zu k=%zu ref=%s max_abs_error=%e\n",
            m, n, k, use_blas_reference ? "blas" : "plain", max_abs_error);
 
     free(a.data);
@@ -122,10 +122,10 @@ int main(void)
     }
 
     if(failed != 0){
-        printf("v8 correctness test failed: %d case(s)\n", failed);
+        printf("v7 correctness test failed: %d case(s)\n", failed);
         return 1;
     }
 
-    printf("all v8 correctness tests passed\n");
+    printf("all v7 correctness tests passed\n");
     return 0;
 }

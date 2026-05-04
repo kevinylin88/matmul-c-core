@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include "multiply.h"
 
-#define MEASURE_TIME 20
+#define MEASURE_TIME 10
 #define MAX_MEMORY 8ULL*1024*1024*1024
 #define MATRIX_ALIGNMENT 32
 
@@ -115,7 +115,7 @@ static void measure_matmul(struct Matrix mat1, struct Matrix mat2, struct Matrix
 
 int main(int argc, char **argv){
 
-    size_t dim[] = {4500};//测试不同规模的矩阵乘法性能
+    size_t dim[] = {64, 128, 1024, 1500, 2000, 2048, 2567, 3456, 4000, 4567, 5678, 6000, 7890, 16000};//测试不同规模的矩阵乘法性能
     int use_openblas = use_openblas_mode(argc, argv);
     const char *bench_name = use_openblas ? "OpenBLAS" : "multiply_improved";
 
