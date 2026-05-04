@@ -84,6 +84,8 @@ void matmul_v3_block(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3)
     }
 }
 
+#ifndef __aarch64__
+
 //加入分块和AVX2指令的版本
 void matmul_v4_avx2(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3){
     if(check_matrix(mat1, mat2, mat3) == -1){exit(-1);}
@@ -759,12 +761,15 @@ void matmul_v8_avx512_omp_improved(
     free(mat2_block.data);
 }
 
+#endif
+
 void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3){
     if(check_matrix(mat1, mat2, mat3) == -1){exit(-1);}
 
+//如果定义了__aarch64__,就执行以下代码，neon
 #ifdef __aarch64__
 #define MATMUL_V8_ARCH matmul_v8_neon_omp
-#else
+#else//如果没有定义，就把这个文本替换成improved函数
 #define MATMUL_V8_ARCH matmul_v8_avx512_omp_improved
 #endif
 
@@ -882,158 +887,160 @@ void matmul_v9_OpenBLAS(struct Matrix mat1, struct Matrix mat2, struct Matrix ma
     );
 }
 
-Transform get_transform(float max_val, float min_val){
-    Transform t;
-    t.scale = (max_val - min_val) / 255.0f;//每个整数对应float走多少
-    t.zero_point = (int)roundf(-128.0f - min_val / t.scale);//0对应的整数值
-    return t;
-}
+//以下内容属自己补充写的内容，不过在提交时尚未写完和做完实验，为了不影响主要的程序，加了注释。
 
-MatrixINT8 transfrom_float_to_int8(struct Matrix mat, Transform t){
-    MatrixINT8 matint;
-    matint.rows = mat.rows;
-    matint.cols = mat.cols;
-    matint.data = malloc(sizeof(int8_t) * matint.rows * matint.cols);
-    if(matint.data == NULL){
-        fprintf(stderr, "Error: malloc failed.\n");
-        exit(-1);
-    }
+// Transform get_transform(float max_val, float min_val){
+//     Transform t;
+//     t.scale = (max_val - min_val) / 255.0f;//每个整数对应float走多少
+//     t.zero_point = (int)roundf(-128.0f - min_val / t.scale);//0对应的整数值
+//     return t;
+// }
 
-    for(size_t i = 0; i < mat.rows * mat.cols; i++){
-        int q = (int)roundf(*(mat.data + i) / t.scale) + t.zero_point;
-        if(q > 127){
-            q = 127;
-        }
-        if(q < -128){
-            q = -128;
-        }
-        *(matint.data + i) = (int8_t)q;
-    }
-    return matint;
-}
+// MatrixINT8 transfrom_float_to_int8(struct Matrix mat, Transform t){
+//     MatrixINT8 matint;
+//     matint.rows = mat.rows;
+//     matint.cols = mat.cols;
+//     matint.data = malloc(sizeof(int8_t) * matint.rows * matint.cols);
+//     if(matint.data == NULL){
+//         fprintf(stderr, "Error: malloc failed.\n");
+//         exit(-1);
+//     }
 
-int check_matrix_int8(MatrixINT8 mat1, MatrixINT8 mat2, MatrixINT32 mat3){
-    if(mat1.data == NULL || mat2.data == NULL || mat3.data == NULL){
-        fprintf(stderr, "Error: matrix data pointer is NULL.\n");
-        return -1;
-    }
-    if(mat1.rows == 0 || mat1.cols == 0 || mat2.rows == 0 || mat2.cols == 0 || mat3.rows == 0 || mat3.cols == 0){
-        fprintf(stderr, "Error: matrix dimensions must be greater than 0.\n");
-        return -1;
-    }
-    if(mat1.cols != mat2.rows){
-        fprintf(stderr, "Error: matrix dimensions do not match for multiplication.\n");
-        return -1;
-    }
-    if(mat3.rows != mat1.rows || mat3.cols != mat2.cols){
-        fprintf(stderr, "Error: output matrix dimensions are incorrect.\n");
-        exit(-1);
-    }
-    return 0;
-}
+//     for(size_t i = 0; i < mat.rows * mat.cols; i++){
+//         int q = (int)roundf(*(mat.data + i) / t.scale) + t.zero_point;
+//         if(q > 127){
+//             q = 127;
+//         }
+//         if(q < -128){
+//             q = -128;
+//         }
+//         *(matint.data + i) = (int8_t)q;
+//     }
+//     return matint;
+// }
 
-void matmul_int8(MatrixINT8 mat1, MatrixINT8 mat2, MatrixINT32 mat3, Transform tA, Transform tB){
-    if(check_matrix_int8(mat1, mat2, mat3) == -1){
-        exit(-1);
-    }
+// int check_matrix_int8(MatrixINT8 mat1, MatrixINT8 mat2, MatrixINT32 mat3){
+//     if(mat1.data == NULL || mat2.data == NULL || mat3.data == NULL){
+//         fprintf(stderr, "Error: matrix data pointer is NULL.\n");
+//         return -1;
+//     }
+//     if(mat1.rows == 0 || mat1.cols == 0 || mat2.rows == 0 || mat2.cols == 0 || mat3.rows == 0 || mat3.cols == 0){
+//         fprintf(stderr, "Error: matrix dimensions must be greater than 0.\n");
+//         return -1;
+//     }
+//     if(mat1.cols != mat2.rows){
+//         fprintf(stderr, "Error: matrix dimensions do not match for multiplication.\n");
+//         return -1;
+//     }
+//     if(mat3.rows != mat1.rows || mat3.cols != mat2.cols){
+//         fprintf(stderr, "Error: output matrix dimensions are incorrect.\n");
+//         exit(-1);
+//     }
+//     return 0;
+// }
 
-    for(size_t i = 0; i < mat3.rows * mat3.cols; i++){
-        *(mat3.data + i) = 0;
-    }
+// void matmul_int8(MatrixINT8 mat1, MatrixINT8 mat2, MatrixINT32 mat3, Transform tA, Transform tB){
+//     if(check_matrix_int8(mat1, mat2, mat3) == -1){
+//         exit(-1);
+//     }
 
-    //挑选分块矩阵
-    for (size_t i = 0; i < mat1.rows; i += BLOCK_LEAP){
-        for(size_t j = 0; j < mat2.cols; j += BLOCK_LEAP){
-            for(size_t k = 0; k < mat1.cols; k = k + BLOCK_LEAP){
-                size_t i_start = i, i_end = MIN(i + BLOCK_LEAP, mat1.rows);//要考虑边界
-                size_t j_start = j, j_end = MIN(j + BLOCK_LEAP, mat2.cols);
-                size_t k_start = k, k_end = MIN(k + BLOCK_LEAP, mat1.cols);
-                //小矩阵内乘法
-                for(size_t id = i_start; id < i_end; id++){
-                    for(size_t kd = k_start; kd < k_end; kd++){
-                        int32_t a = (int32_t)*(mat1.data + id*mat1.cols + kd) - tA.zero_point;
-                        for(size_t jd = j_start; jd < j_end; jd++){
-                            int32_t b = (int32_t)*(mat2.data + kd*mat2.cols + jd) - tB.zero_point;
-                            *(mat3.data + id*mat3.cols + jd) += a * b;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
+//     for(size_t i = 0; i < mat3.rows * mat3.cols; i++){
+//         *(mat3.data + i) = 0;
+//     }
 
-struct Matrix transform_int32_to_float(MatrixINT32 mat, Transform tA, Transform tB){
-    struct Matrix mat_float;
-    mat_float.rows = mat.rows;
-    mat_float.cols = mat.cols;
-    mat_float.data = malloc(sizeof(float) * mat.rows * mat.cols);
-    if(mat_float.data == NULL){
-        fprintf(stderr, "Error: malloc failed.\n");
-        exit(-1);
-    }
+//     //挑选分块矩阵
+//     for (size_t i = 0; i < mat1.rows; i += BLOCK_LEAP){
+//         for(size_t j = 0; j < mat2.cols; j += BLOCK_LEAP){
+//             for(size_t k = 0; k < mat1.cols; k = k + BLOCK_LEAP){
+//                 size_t i_start = i, i_end = MIN(i + BLOCK_LEAP, mat1.rows);//要考虑边界
+//                 size_t j_start = j, j_end = MIN(j + BLOCK_LEAP, mat2.cols);
+//                 size_t k_start = k, k_end = MIN(k + BLOCK_LEAP, mat1.cols);
+//                 //小矩阵内乘法
+//                 for(size_t id = i_start; id < i_end; id++){
+//                     for(size_t kd = k_start; kd < k_end; kd++){
+//                         int32_t a = (int32_t)*(mat1.data + id*mat1.cols + kd) - tA.zero_point;
+//                         for(size_t jd = j_start; jd < j_end; jd++){
+//                             int32_t b = (int32_t)*(mat2.data + kd*mat2.cols + jd) - tB.zero_point;
+//                             *(mat3.data + id*mat3.cols + jd) += a * b;
+//                         }
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
 
-    for(size_t i = 0; i < mat.rows * mat.cols; i++){
-        *(mat_float.data + i) = (float)((double)*(mat.data + i) * (double)tA.scale * (double)tB.scale);
-    }
-    return mat_float;
-}
+// struct Matrix transform_int32_to_float(MatrixINT32 mat, Transform tA, Transform tB){
+//     struct Matrix mat_float;
+//     mat_float.rows = mat.rows;
+//     mat_float.cols = mat.cols;
+//     mat_float.data = malloc(sizeof(float) * mat.rows * mat.cols);
+//     if(mat_float.data == NULL){
+//         fprintf(stderr, "Error: malloc failed.\n");
+//         exit(-1);
+//     }
 
-void compare_error(struct Matrix expected, struct Matrix actual){
-    if(expected.data == NULL || actual.data == NULL){
-        fprintf(stderr, "Error: matrix data pointer is NULL.\n");
-        return;
-    }
-    if(expected.rows != actual.rows || expected.cols != actual.cols){
-        fprintf(stderr, "Error: matrix dimensions do not match for error comparison.\n");
-        return;
-    }
+//     for(size_t i = 0; i < mat.rows * mat.cols; i++){
+//         *(mat_float.data + i) = (float)((double)*(mat.data + i) * (double)tA.scale * (double)tB.scale);
+//     }
+//     return mat_float;
+// }
 
-    double sum_abs_error = 0.0;
-    double sum_abs_expected = 0.0;
-    double max_abs_error = 0.0;
-    size_t max_error_i = 0;
-    size_t max_error_j = 0;
+// void compare_error(struct Matrix expected, struct Matrix actual){
+//     if(expected.data == NULL || actual.data == NULL){
+//         fprintf(stderr, "Error: matrix data pointer is NULL.\n");
+//         return;
+//     }
+//     if(expected.rows != actual.rows || expected.cols != actual.cols){
+//         fprintf(stderr, "Error: matrix dimensions do not match for error comparison.\n");
+//         return;
+//     }
 
-    for(size_t i = 0; i < expected.rows; i++){
-        for(size_t j = 0; j < expected.cols; j++){
-            size_t index = i * expected.cols + j;
-            double expected_val = (double)expected.data[index];
-            double actual_val = (double)actual.data[index];
-            double abs_error = expected_val - actual_val;
-            if(abs_error < 0.0){
-                abs_error = -abs_error;
-            }
+//     double sum_abs_error = 0.0;
+//     double sum_abs_expected = 0.0;
+//     double max_abs_error = 0.0;
+//     size_t max_error_i = 0;
+//     size_t max_error_j = 0;
 
-            double abs_expected = expected_val;
-            if(abs_expected < 0.0){
-                abs_expected = -abs_expected;
-            }
+//     for(size_t i = 0; i < expected.rows; i++){
+//         for(size_t j = 0; j < expected.cols; j++){
+//             size_t index = i * expected.cols + j;
+//             double expected_val = (double)expected.data[index];
+//             double actual_val = (double)actual.data[index];
+//             double abs_error = expected_val - actual_val;
+//             if(abs_error < 0.0){
+//                 abs_error = -abs_error;
+//             }
 
-            sum_abs_error += abs_error;
-            sum_abs_expected += abs_expected;
-            if(abs_error > max_abs_error){
-                max_abs_error = abs_error;
-                max_error_i = i;
-                max_error_j = j;
-            }
-        }
-    }
+//             double abs_expected = expected_val;
+//             if(abs_expected < 0.0){
+//                 abs_expected = -abs_expected;
+//             }
 
-    if(sum_abs_expected == 0.0){
-        printf("ERROR_COMPARE: sum_abs_error=%e, sum_abs_expected=0, error_ratio=inf, max_abs=%e at (%zu, %zu)\n",
-                sum_abs_error,
-                max_abs_error,
-                max_error_i,
-                max_error_j);
-        return;
-    }
+//             sum_abs_error += abs_error;
+//             sum_abs_expected += abs_expected;
+//             if(abs_error > max_abs_error){
+//                 max_abs_error = abs_error;
+//                 max_error_i = i;
+//                 max_error_j = j;
+//             }
+//         }
+//     }
 
-    printf("ERROR_COMPARE: sum_abs_error=%e, sum_abs_expected=%e, error_ratio=%e, max_abs=%e at (%zu, %zu)\n",
-            sum_abs_error,
-            sum_abs_expected,
-            sum_abs_error / sum_abs_expected,
-            max_abs_error,
-            max_error_i,
-            max_error_j);
-}
+//     if(sum_abs_expected == 0.0){
+//         printf("ERROR_COMPARE: sum_abs_error=%e, sum_abs_expected=0, error_ratio=inf, max_abs=%e at (%zu, %zu)\n",
+//                 sum_abs_error,
+//                 max_abs_error,
+//                 max_error_i,
+//                 max_error_j);
+//         return;
+//     }
+
+//     printf("ERROR_COMPARE: sum_abs_error=%e, sum_abs_expected=%e, error_ratio=%e, max_abs=%e at (%zu, %zu)\n",
+//             sum_abs_error,
+//             sum_abs_expected,
+//             sum_abs_error / sum_abs_expected,
+//             max_abs_error,
+//             max_error_i,
+//             max_error_j);
+// }

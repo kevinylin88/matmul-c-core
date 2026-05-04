@@ -55,11 +55,13 @@ int set_memory_limit(size_t bytes);
 void multiply_plain(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v2_ikj(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v3_block(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
+#ifndef __aarch64__
 void matmul_v4_avx2(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v5_openmp(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v6_omp_avx_6x16(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v7_avx512_omp(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v8_avx512_omp_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, size_t ii, size_t jj, size_t kk);
+#endif
 #ifdef __aarch64__
 void matmul_v8_neon_omp(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, size_t ii, size_t jj, size_t kk);
 #endif
@@ -67,6 +69,7 @@ void matmul_v9_OpenBLAS(struct Matrix mat1, struct Matrix mat2, struct Matrix ma
 void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void compare_error(struct Matrix expected, struct Matrix actual);
 
+#ifndef __aarch64__
 void avx_kernel_1x8(
     struct Matrix mat1,
     struct Matrix mat2,
@@ -207,6 +210,7 @@ void avx512_kernel_6x32_panelb(
     size_t i_start,
     size_t j_start,
     size_t valid_k);
+#endif
 
 #ifdef __aarch64__
 void neon_kernel_1x16(
@@ -248,6 +252,18 @@ void neon_kernel_6x16(
     size_t i_start,
     size_t j_start,
     size_t valid_k);
+
+void neon_kernel_panelb_tail(
+    struct Matrix mat1,
+    struct Matrix mat2,
+    struct Matrix mat3,
+    int id,
+    int jd,
+    size_t i_start,
+    size_t j_start,
+    size_t valid_k,
+    size_t rows,
+    size_t cols);
 #endif
 
 Transform get_transform(float max_val, float min_val);

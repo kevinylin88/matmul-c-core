@@ -1,3 +1,4 @@
+//本部分逻辑和x86平台逻辑完全相同
 #ifdef __aarch64__
 #include "multiply.h"
 
@@ -79,6 +80,7 @@ void matmul_v8_neon_omp(
                         for(size_t kd = 0; kd < mat2_block.rows; kd++){
                             float *dst = mat2_block.data + panel * mat2_block.rows * NR + kd * NR;
                             float *src = mat2.data + (k_start + kd) * mat2.cols + j_start + panel * NR;
+                            memset(dst, 0, (size_t)NR * sizeof(*dst));
                             for(size_t inner = 0; inner < panel_cols; inner++){
                                 *(dst + inner) = *(src + inner);
                             }
@@ -106,17 +108,15 @@ void matmul_v8_neon_omp(
                             for(; jd + 16 <= mat2_block.cols; jd += 16){
                                 neon_kernel_6x16(mat1_block, mat2_block, mat3, (int)id, (int)jd, i_start, j_start, mat1_block.cols);
                             }
-                            for(size_t row = 0; row < 6; row++){
-                                float *mat3_row = mat3.data + (i_start + id + row) * mat3.cols + j_start;
-                                for(size_t kd = 0; kd < mat1_block.cols; kd++){
-                                    float a = *(mat1_block.data + (id + row) * mat1_block.cols + kd);
-                                    for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                        size_t panel = tail_jd / NR;
-                                        size_t inner = tail_jd % NR;
-                                        float b = *(mat2_block.data + panel * mat2_block.rows * NR + kd * NR + inner);
-                                        *(mat3_row + tail_jd) += a * b;
-                                    }
-                                }
+                            if(jd < mat2_block.cols){
+                                neon_kernel_panelb_tail(
+                                    mat1_block, mat2_block, mat3,
+                                    (int)id, (int)jd,
+                                    i_start, j_start,
+                                    mat1_block.cols,
+                                    6,
+                                    mat2_block.cols - jd
+                                );
                             }
                             id += 6;
                         }
@@ -125,17 +125,15 @@ void matmul_v8_neon_omp(
                             for(; jd + 16 <= mat2_block.cols; jd += 16){
                                 neon_kernel_4x16(mat1_block, mat2_block, mat3, (int)id, (int)jd, i_start, j_start, mat1_block.cols);
                             }
-                            for(size_t row = 0; row < 4; row++){
-                                float *mat3_row = mat3.data + (i_start + id + row) * mat3.cols + j_start;
-                                for(size_t kd = 0; kd < mat1_block.cols; kd++){
-                                    float a = *(mat1_block.data + (id + row) * mat1_block.cols + kd);
-                                    for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                        size_t panel = tail_jd / NR;
-                                        size_t inner = tail_jd % NR;
-                                        float b = *(mat2_block.data + panel * mat2_block.rows * NR + kd * NR + inner);
-                                        *(mat3_row + tail_jd) += a * b;
-                                    }
-                                }
+                            if(jd < mat2_block.cols){
+                                neon_kernel_panelb_tail(
+                                    mat1_block, mat2_block, mat3,
+                                    (int)id, (int)jd,
+                                    i_start, j_start,
+                                    mat1_block.cols,
+                                    4,
+                                    mat2_block.cols - jd
+                                );
                             }
                             id += 4;
                         }
@@ -144,17 +142,15 @@ void matmul_v8_neon_omp(
                             for(; jd + 16 <= mat2_block.cols; jd += 16){
                                 neon_kernel_2x16(mat1_block, mat2_block, mat3, (int)id, (int)jd, i_start, j_start, mat1_block.cols);
                             }
-                            for(size_t row = 0; row < 2; row++){
-                                float *mat3_row = mat3.data + (i_start + id + row) * mat3.cols + j_start;
-                                for(size_t kd = 0; kd < mat1_block.cols; kd++){
-                                    float a = *(mat1_block.data + (id + row) * mat1_block.cols + kd);
-                                    for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                        size_t panel = tail_jd / NR;
-                                        size_t inner = tail_jd % NR;
-                                        float b = *(mat2_block.data + panel * mat2_block.rows * NR + kd * NR + inner);
-                                        *(mat3_row + tail_jd) += a * b;
-                                    }
-                                }
+                            if(jd < mat2_block.cols){
+                                neon_kernel_panelb_tail(
+                                    mat1_block, mat2_block, mat3,
+                                    (int)id, (int)jd,
+                                    i_start, j_start,
+                                    mat1_block.cols,
+                                    2,
+                                    mat2_block.cols - jd
+                                );
                             }
                             id += 2;
                         }
@@ -163,15 +159,15 @@ void matmul_v8_neon_omp(
                             for(; jd + 16 <= mat2_block.cols; jd += 16){
                                 neon_kernel_1x16(mat1_block, mat2_block, mat3, (int)id, (int)jd, i_start, j_start, mat1_block.cols);
                             }
-                            float *mat3_row = mat3.data + (i_start + id) * mat3.cols + j_start;
-                            for(size_t kd = 0; kd < mat1_block.cols; kd++){
-                                float a = *(mat1_block.data + id * mat1_block.cols + kd);
-                                for(size_t tail_jd = jd; tail_jd < mat2_block.cols; tail_jd++){
-                                    size_t panel = tail_jd / NR;
-                                    size_t inner = tail_jd % NR;
-                                    float b = *(mat2_block.data + panel * mat2_block.rows * NR + kd * NR + inner);
-                                    *(mat3_row + tail_jd) += a * b;
-                                }
+                            if(jd < mat2_block.cols){
+                                neon_kernel_panelb_tail(
+                                    mat1_block, mat2_block, mat3,
+                                    (int)id, (int)jd,
+                                    i_start, j_start,
+                                    mat1_block.cols,
+                                    1,
+                                    mat2_block.cols - jd
+                                );
                             }
                             id++;
                         }
