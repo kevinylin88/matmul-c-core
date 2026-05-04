@@ -762,6 +762,12 @@ void matmul_v8_avx512_omp_improved(
 void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3){
     if(check_matrix(mat1, mat2, mat3) == -1){exit(-1);}
 
+#ifdef __aarch64__
+#define MATMUL_V8_ARCH matmul_v8_neon_omp
+#else
+#define MATMUL_V8_ARCH matmul_v8_avx512_omp_improved
+#endif
+
     size_t total_elems = mat1.cols * mat1.rows + mat2.cols * mat2.rows;
 
     if(total_elems <= 128*128*2){
@@ -770,86 +776,87 @@ void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat
     }
 
     if(total_elems <= 600*600*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 36, 512, 192);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 36, 512, 192);
         return;
     }
 
     if(total_elems <= 850*850*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 48, 640, 128);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 48, 640, 128);
         return;
     }
 
     if(total_elems <= 1000*1000*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 6, 896, 128);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 6, 896, 128);
         return;
     }
 
     if(total_elems <= 1500*1500*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 12, 1792, 208);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 12, 1792, 208);
         return;
     }
 
     if(total_elems <= 2000*2000*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 126, 2048, 208);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 126, 2048, 208);
         return;
     }
 
     if(total_elems <= 2500*2500*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 84, 3840, 240);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 84, 3840, 240);
         return;
     }
 
     if(total_elems <= 3000*3000*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 72, 3840, 240);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 72, 3840, 240);
         return;
     }
 
     if(total_elems <= 3500*3500*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 3840, 240);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 60, 3840, 240);
         return;
     }
 
     if(total_elems <= 4000*4000*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 5120, 256);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 60, 5120, 256);
         return;
     }
 
     if(total_elems <= 4500*4500*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 5120, 256);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 60, 5120, 256);
         return;
     }
 
     if(total_elems <= 5000*5000*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 5632, 256);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 60, 5632, 256);
         return;
     }
 
     if(total_elems <= 5500*5500*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 5632, 256);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 60, 5632, 256);
         return;
     }
 
     if(total_elems <= 6000*6000*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 6144, 256);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 60, 6144, 256);
         return;
     }
 
     if(total_elems <= 6500*6500*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 8192, 256);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 60, 8192, 256);
         return;
     }
 
     if(total_elems <= 7000*7000*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 72, 8192, 288);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 72, 8192, 288);
         return;
     }
 
     if(total_elems <= 7500*7500*2){
-        matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 60, 8192, 256);
+        MATMUL_V8_ARCH(mat1, mat2, mat3, 60, 8192, 256);
         return;
     }
 
-    matmul_v8_avx512_omp_improved(mat1, mat2, mat3, 132, 8640, 160);
+    MATMUL_V8_ARCH(mat1, mat2, mat3, 132, 8640, 160);
+#undef MATMUL_V8_ARCH
 }
 
 

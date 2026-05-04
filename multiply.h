@@ -8,17 +8,20 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef __aarch64__
+#include <arm_neon.h>
+#define NR 16
+#else
 #include <immintrin.h>
+#include <xmmintrin.h>
+#define NR 32
+#endif
 #include <omp.h>
 #include <sys/resource.h>//资源控制
 #include <threads.h>
-#include <xmmintrin.h>
 #include <cblas.h>
 #ifndef BLOCK_LEAP
 #define BLOCK_LEAP 240
-#endif
-#ifndef NR
-#define NR 32
 #endif
 #define SIMD_LEAP 8
 #define SIMD_LEAP_ROW 6 //寄存器大小是四行
@@ -57,6 +60,9 @@ void matmul_v5_openmp(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3
 void matmul_v6_omp_avx_6x16(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v7_avx512_omp(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void matmul_v8_avx512_omp_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, size_t ii, size_t jj, size_t kk);
+#ifdef __aarch64__
+void matmul_v8_neon_omp(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, size_t ii, size_t jj, size_t kk);
+#endif
 void matmul_v9_OpenBLAS(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void multiply_improved(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3);
 void compare_error(struct Matrix expected, struct Matrix actual);
@@ -201,6 +207,48 @@ void avx512_kernel_6x32_panelb(
     size_t i_start,
     size_t j_start,
     size_t valid_k);
+
+#ifdef __aarch64__
+void neon_kernel_1x16(
+    struct Matrix mat1,
+    struct Matrix mat2,
+    struct Matrix mat3,
+    int id,
+    int jd,
+    size_t i_start,
+    size_t j_start,
+    size_t valid_k);
+
+void neon_kernel_2x16(
+    struct Matrix mat1,
+    struct Matrix mat2,
+    struct Matrix mat3,
+    int id,
+    int jd,
+    size_t i_start,
+    size_t j_start,
+    size_t valid_k);
+
+void neon_kernel_4x16(
+    struct Matrix mat1,
+    struct Matrix mat2,
+    struct Matrix mat3,
+    int id,
+    int jd,
+    size_t i_start,
+    size_t j_start,
+    size_t valid_k);
+
+void neon_kernel_6x16(
+    struct Matrix mat1,
+    struct Matrix mat2,
+    struct Matrix mat3,
+    int id,
+    int jd,
+    size_t i_start,
+    size_t j_start,
+    size_t valid_k);
+#endif
 
 Transform get_transform(float max_val, float min_val);
 MatrixINT8 transfrom_float_to_int8(struct Matrix mat, Transform t);
