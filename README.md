@@ -1,4 +1,4 @@
-# Project 3 Matrix Multiplication
+# Optimize Matrix Multiplication
 
 This project implements and benchmarks several SGEMM-style matrix
 multiplication kernels in C. The current optimized path is
