@@ -196,4 +196,111 @@ void neon_kernel_6x16(
         }
     }
 }
+
+static void scalar_kernel_row_major(
+    struct Matrix mat1,
+    struct Matrix mat2,
+    struct Matrix mat3,
+    int id,
+    int jd,
+    size_t i_start,
+    size_t j_start,
+    size_t valid_k,
+    size_t rows,
+    size_t cols
+){
+    for(size_t row = 0; row < rows; row++){
+        float *mat3_row = mat3.data + (i_start + (size_t)id + row) * mat3.cols + j_start + (size_t)jd;
+        for(size_t k = 0; k < valid_k; k++){
+            float a = *(mat1.data + ((size_t)id + row) * mat1.cols + k);
+            float *mat2_row = mat2.data + k * mat2.cols + (size_t)jd;
+            for(size_t col = 0; col < cols; col++){
+                *(mat3_row + col) += a * *(mat2_row + col);
+            }
+        }
+    }
+}
+
+static void scalar_kernel_panelb(
+    struct Matrix mat1,
+    struct Matrix mat2,
+    struct Matrix mat3,
+    int id,
+    int jd,
+    size_t i_start,
+    size_t j_start,
+    size_t valid_k,
+    size_t rows,
+    size_t cols
+){
+    for(size_t row = 0; row < rows; row++){
+        float *mat3_row = mat3.data + (i_start + (size_t)id + row) * mat3.cols + j_start + (size_t)jd;
+        for(size_t k = 0; k < valid_k; k++){
+            float a = *(mat1.data + ((size_t)id + row) * mat1.cols + k);
+            for(size_t col = 0; col < cols; col++){
+                size_t abs_col = (size_t)jd + col;
+                size_t panel = abs_col / NR;
+                size_t inner = abs_col % NR;
+                float b = *(mat2.data + panel * valid_k * NR + k * NR + inner);
+                *(mat3_row + col) += a * b;
+            }
+        }
+    }
+}
+
+void avx_kernel_1x8(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 1, 8);
+}
+
+void avx_kernel_2x8(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 2, 8);
+}
+
+void avx_kernel_4x8(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 4, 8);
+}
+
+void avx_kernel_6x8(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 6, 8);
+}
+
+void avx_kernel_2x16(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 2, 16);
+}
+
+void avx_kernel_6x16(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 6, 16);
+}
+
+void avx512_kernel_1x32(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 1, 32);
+}
+
+void avx512_kernel_2x32(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 2, 32);
+}
+
+void avx512_kernel_4x32(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 4, 32);
+}
+
+void avx512_kernel_6x32(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_row_major(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 6, 32);
+}
+
+void avx512_kernel_1x32_panelb(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_panelb(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 1, 32);
+}
+
+void avx512_kernel_2x32_panelb(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_panelb(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 2, 32);
+}
+
+void avx512_kernel_4x32_panelb(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_panelb(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 4, 32);
+}
+
+void avx512_kernel_6x32_panelb(struct Matrix mat1, struct Matrix mat2, struct Matrix mat3, int id, int jd, size_t i_start, size_t j_start, size_t valid_k){
+    scalar_kernel_panelb(mat1, mat2, mat3, id, jd, i_start, j_start, valid_k, 6, 32);
+}
 #endif
